@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private LocalActivityManager lam;
     private MyWebView web;
     private AutoCompleteTextView input;
+    private AutoCompleteTextView input_number;
     private Spinner spinner;
     private FloatingActionButton add_course;
     private String cookie;
@@ -83,9 +84,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
         // 获取组件
         Button button = (Button) findViewById(R.id.send);
+        Button button_xuanke = (Button) findViewById(R.id.xuanke);
         add_course = (FloatingActionButton) findViewById(R.id.fb_add);
         FloatingActionButton remove_course = (FloatingActionButton) findViewById(R.id.fb_delete);
         input = (AutoCompleteTextView) findViewById(R.id.input);
+        input_number = (AutoCompleteTextView) findViewById(R.id.input_number);
         spinner = (Spinner) findViewById(R.id.spinner);
         web = (MyWebView) findViewById(R.id.web);
         WebView web2 = (WebView) findViewById(R.id.web_view_2);
@@ -122,6 +125,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         // http://www.szu.me/kc/index.php  课程评价网页
         // 监听事件
         button.setOnClickListener(this);
+        button_xuanke.setOnClickListener((this));
         add_course.setOnClickListener(this);
         remove_course.setOnClickListener(this);
         // webview滚动监听事件,当webview滚动时隐藏悬浮按钮,停止滚动后300ms显示
@@ -253,6 +257,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String getRequest(String keyword) {
         try {
             String get_result = url + keyword;
+            get_result = URLEncoder.encode(get_result, "utf-8");
             URL u = new URL(get_result);
             HttpURLConnection connection = (HttpURLConnection) u.openConnection();
             connection.setRequestMethod("GET");
@@ -412,6 +417,31 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 adapter.add(QueryStr);
                 history.add(QueryStr);
             }
+        }
+        else if(v.getId()==R.id.xuanke){
+            QueryStr = input_number.getText().toString();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        query = getRequest("/choosecheck.asp?stu_no=test&no_type="+QueryStr+"必修");//QueryStr;
+                        Log.d("1", "encode: " + query);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    // 修改表格
+                    modify_table();
+                    // 显示新设计好的表格
+                    web.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            web.getSettings().setDefaultTextEncodingName("UTF-8");// 设置默认为utf-8
+                            web.loadData(query, "text/html; charset=UTF-8", null);// 这种写法可以正确解码
+                        }
+                    });
+                }
+            }).start();
+
         }
     }
 }
