@@ -205,11 +205,13 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                     out.write(sendStr.getBytes());
                     out.flush();
                     out.close();
+
                     Reader r = new InputStreamReader(connection.getInputStream(), "GB2312");
                     int c;
                     htmlbuffer = "";
                     while ((c = r.read()) != -1) {  htmlbuffer += (char) c; }
                     r.close();
+
                     Looper.prepare();
                     if (htmlbuffer.contains("验证码输入错误")) {
                         Toast toast = Toast.makeText(getBaseContext(), "验证码错误,请重新输入", Toast.LENGTH_SHORT);
@@ -223,7 +225,27 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                         Toast toast = Toast.makeText(getBaseContext(), "学号错误，请重新输入", Toast.LENGTH_SHORT);
                         toast.show();
                         getImg();   // 重新获取验证码
-                    } else {
+                    }
+                    else {//登陆成功
+//                       ************************
+                        URL u1 = new URL("http://39.108.181.169/xuanke/");
+                        HttpURLConnection connection1 = (HttpURLConnection) u1.openConnection();
+                        connection1.setRequestMethod("POST");
+                        connection1.setDoOutput(true);
+                        connection1.setDoInput(true);
+                        connection1.setInstanceFollowRedirects(false);   // 自动重定向
+//                    cookies
+                        OutputStream out1 = connection1.getOutputStream();
+                        out1.write(sendStr.getBytes());
+                        out1.flush();
+                        out1.close();
+                        Reader r1 = new InputStreamReader(connection1.getInputStream(), "GB2312");
+                        int c1;
+                        String htmlbuffer1 = "";
+                        while ((c1 = r1.read()) != -1) {  htmlbuffer1 += (char) c1; }
+                        r1.close();
+
+//                   ******************
                         // 跳转到下个活动
                         Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                         intent.putExtra("cookie", cookie1);
