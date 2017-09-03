@@ -3,7 +3,10 @@ package com.example.administrator.myapplication;
 import android.app.LocalActivityManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.Image;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Looper;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
@@ -17,10 +20,15 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TabHost;
 import android.widget.Toast;
 
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
@@ -29,7 +37,10 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.regex.Matcher;
@@ -48,7 +59,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private LocalActivityManager lam;
     private MyWebView web;
     private AutoCompleteTextView input;
+    //选课组件
     private AutoCompleteTextView input_number;
+    private EditText input_code;
+    private ImageView code_image;
+    File file;
+    private String code_str;
+    private boolean enable_select;
+    private boolean flag;
+    //
     private Spinner spinner;
     private FloatingActionButton add_course;
     private String cookie;
@@ -83,14 +102,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         // 获取组件
-        Button button = (Button) findViewById(R.id.send);
+        //选课组件
         Button button_xuanke = (Button) findViewById(R.id.xuanke);
+        input_number = (AutoCompleteTextView) findViewById(R.id.input_number);
+        input_code = (EditText) findViewById((R.id.code));
+        code_image = (ImageView) findViewById(R.id.image);
+        code_image.setOnClickListener(this);
+        //
+        Button button = (Button) findViewById(R.id.send);
         add_course = (FloatingActionButton) findViewById(R.id.fb_add);
         FloatingActionButton remove_course = (FloatingActionButton) findViewById(R.id.fb_delete);
         input = (AutoCompleteTextView) findViewById(R.id.input);
-        input_number = (AutoCompleteTextView) findViewById(R.id.input_number);
+
         spinner = (Spinner) findViewById(R.id.spinner);
         web = (MyWebView) findViewById(R.id.web);
+        web.setWebViewClient(new WebViewClient());
         WebView web2 = (WebView) findViewById(R.id.web_view_2);
         WebView web3 = (WebView) findViewById(R.id.web_view_3);
         WebView web4 = (WebView) findViewById(R.id.web_view_4);
@@ -98,7 +124,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Intent intent = getIntent();
         cookie = intent.getStringExtra("cookie");
         url = intent.getStringExtra("url");
-        // 获取课程表和选课结果
+        // 获取课程表和选课结果和选课验证码
         get_course_table();
         // 选项卡初始化
         lam = new LocalActivityManager(MainActivity.this, false);
@@ -200,6 +226,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         + limit_num + "</td><td>" + chosen_num + "</td></tr>";
                 // 高亮显示可选课程
                 if (main_chosen_num < main_limit_num) {
+                    enable_select = true;
                     part[i] = part[i].replaceAll("<tr>", "<tr bgcolor=\"yellow\">");
                 }
             } catch (Exception e) {
@@ -232,12 +259,56 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String[] temp = temp_history.split("\n");
         Collections.addAll(history, temp);
     }
+    // 获取验证码
+    void getImg() {
+        try {
+//            double a = Math.random();
+            String getImg = url + "/code.asp";
+            Log.d("1", "getImg: "+getImg);
+            URL u = new URL(getImg);
+            HttpURLConnection connection = (HttpURLConnection) u.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Accept", "image/webp,image/*,*/*;q=0.8");
+            connection.setRequestProperty("Cookie", cookie);
 
-    // 获取课程表、选课结果
+            DataInputStream input = new DataInputStream(connection.getInputStream());
+             file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),"codeimg1.jpg");
+            FileOutputStream output = new FileOutputStream(file);
+            byte[] b = new byte[1024];
+            int len;
+            while ((len = input.read(b)) != -1) {
+                output.write(b, 0, len);
+            }
+            output.flush();
+            output.close();
+            input.close();
+            runOnUiThread(new Runnable(){
+                @Override
+                public void run() {
+                    code_image.setImageURI(null);
+                    code_image.setImageURI(Uri.fromFile(file));
+                    Log.d("1", "img1 run code");
+                }
+            });
+//            code_image.post(new Runnable() {
+//                @Override
+//                public void run() {
+//                    Log.d("1", "img1 run code begin");
+//                    code_image.setImageURI(null);
+//                    code_image.setImageURI(Uri.fromFile(file));
+//                    Log.d("1", "img1 run code over");
+//                }
+//            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    // 获取课程表、选课结果和验证码
     private void get_course_table() {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                getImg();
                 xuan_ke = getRequest("/showresult.asp");
                 ke_cheng_biao = getRequest("/get_schedule.asp?");
                 // 保存结果到本地，成为离线缓存
@@ -257,7 +328,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String getRequest(String keyword) {
         try {
             String get_result = url + keyword;
-            get_result = URLEncoder.encode(get_result, "utf-8");
+            Log.d("1", "getRequest: " +get_result);
             URL u = new URL(get_result);
             HttpURLConnection connection = (HttpURLConnection) u.openConnection();
             connection.setRequestMethod("GET");
@@ -371,7 +442,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     // 点击事件
     @Override
     public void onClick(View v) {
-        if (v.getId() == R.id.fb_add) {
+        if (v.getId() == R.id.xuanke) {
             Toast.makeText(MainActivity.this, "选课按钮,敬请期待...", Toast.LENGTH_SHORT).show();
         } else if (v.getId() == R.id.fb_delete) {
             Toast.makeText(MainActivity.this, "退课按钮,敬请期待...", Toast.LENGTH_SHORT).show();
@@ -418,30 +489,98 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 history.add(QueryStr);
             }
         }
-        else if(v.getId()==R.id.xuanke){
+        else if(v.getId()==R.id.fb_add){
+            code_str = input_code.getText().toString();
             QueryStr = input_number.getText().toString();
+            if(code_str.length() == 0) {
+                Toast.makeText(MainActivity.this, "请输入验证码！", Toast.LENGTH_SHORT).show();
+            }
+            else if(QueryStr.length() == 0){
+                Toast.makeText(MainActivity.this, "请输入课程编号！", Toast.LENGTH_SHORT).show();
+            }
+            else
+            {
+                is_select(QueryStr);//查询是否可选该课程
+                Log.d("1", "flag"+flag);
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        final Map<String, String> map = new HashMap<>();
+                        map.put("Cookie", cookie);
+                        try {
+                            query = getRequest("/choose.asp?GetCode="+code_str+"&no_type="+QueryStr+URLEncoder.encode("必修","utf-8")+"&submit="+URLEncoder.encode("确    定","utf-8"));//QueryStr;
+                            Log.d("1", "encode: " + query);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        web.post(new Runnable() {
+                            @Override
+                            public void run() {
+//                                web.getSettings().setDefaultTextEncodingName("UTF-8");// 设置默认为utf-8
+//                                web.loadData(query, "text/html; charset=UTF-8", null);// 这种写法可以正确解码
+//                                Log.d("1", "run: "+"web");
+                                try {
+                                    web.getSettings().setDefaultTextEncodingName("GB2312");// 设置为GB2312
+                                    Log.d("1", "run: map"+ map);
+                                    web.loadUrl(url+"/choose.asp?GetCode="+code_str+"&no_type="+QueryStr+URLEncoder.encode("必修","utf-8")
+                                            +"&submit=%E7%A1%AE++++%E5%AE%9A", map);
+
+                                } catch (UnsupportedEncodingException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
+                    }
+                }).start();
+            }
+
+
+        }
+        else if(v.getId() == R.id.image){
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    try {
-                        query = getRequest("/choosecheck.asp?stu_no=test&no_type="+QueryStr+"必修");//QueryStr;
-                        Log.d("1", "encode: " + query);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    // 修改表格
-                    modify_table();
-                    // 显示新设计好的表格
-                    web.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            web.getSettings().setDefaultTextEncodingName("UTF-8");// 设置默认为utf-8
-                            web.loadData(query, "text/html; charset=UTF-8", null);// 这种写法可以正确解码
-                        }
-                    });
+                    getImg();
                 }
             }).start();
-
         }
+    }
+    void is_select( final String str){
+        // 抓取人数信息
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String num_status1;
+                 num_status1 = getRequest("/sele_count1.asp?course_no=" +str);
+                Log.d("1", "run getrequest: "+num_status1);
+                String num_regex = "<br>主选学生限制人数：([\\d]+)&nbsp;&nbsp;主选学生已选人数：([\\d]+)<br>非主选学生限制人数：([\\d]+)&nbsp;&nbsp;非主选学生已选人数：([\\d]+)</body>";
+                Pattern pattern1 = Pattern.compile(num_regex);
+                Matcher matcher1 = pattern1.matcher(num_status1);
+                while (matcher1.find()) {
+                    int main_limit_num = Integer.parseInt(matcher1.group(1));
+                    int main_chosen_num = Integer.parseInt(matcher1.group(2));
+                    int limit_num = Integer.parseInt(matcher1.group(3));
+                    int chosen_num = Integer.parseInt(matcher1.group(4));
+                    Log.d("1", "main_limit num: " + main_limit_num);
+                    Log.d("1", "main_chosen num: " + main_chosen_num);
+                    Log.d("1", "limit num: " + limit_num);
+                    Log.d("1", "chosen num: " + chosen_num);
+                    Looper.prepare();
+                    if (main_limit_num > main_chosen_num) {//主选有空位
+                        Toast.makeText(MainActivity.this, "主选可以选啦!", Toast.LENGTH_SHORT).show();
+
+                    } else if (limit_num > chosen_num) {//非主选有空位
+                        Toast.makeText(MainActivity.this, "非主选可以选啦!", Toast.LENGTH_SHORT).show();
+
+                    } else {
+                        Toast.makeText(MainActivity.this, "还没有空位...", Toast.LENGTH_SHORT).show();
+
+                    }
+                    Looper.loop();
+                }
+            }
+        }).start();
+
+
     }
 }
